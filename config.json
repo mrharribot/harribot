@@ -1,0 +1,81 @@
+{
+"COMMANDS":[
+	{
+		"name":"nek",
+		"type":"image",
+		"img":"nek.png",
+		"function":"overlay",
+		"description":"nek minnut"
+	},
+        {
+                "name":"call",
+                "type":"image",
+                "img":"posner.png",
+                "function":"overlay",
+                "description":"mike on the phone"
+        },
+	{
+		"name":"worf",
+		"type":"image",
+		"img":"worf.png",
+		"function":"underlay",
+		"coords": [ 570, 0, 1456, 800 ],
+		"description":"cmdr worf viewscreen"
+	},
+        {
+                "name":"bmo",
+                "type":"image",
+                "img":"bmo.png",
+                "function":"underlay",
+                "coords": [ 470, 283, 747, 505 ],
+                "description":"jake plays bmo"
+        },
+        {
+                "name":"shopper",
+                "type":"image",
+                "img":"shopper.png",
+                "function":"underlay",
+                "coords": [ 270,188,455,346 ],
+                "description":"springfield shopper gay pride"
+        },
+        {
+                "name":"skinner",
+                "type":"image",
+                "img":"skinner.png",
+                "function":"underlay",
+                "coords": [ 147,0,598,480 ],
+                "description":"delightfully devilish seymour"
+        },
+
+	{
+		"name":"mud",
+		"type":"random",
+		"candidates": ["mud1","mud2","mud3"],
+		"hidden":true
+	},
+	{
+		"name":"mud1",
+		"type":"image",
+		"img":"muda.png",
+		"function":"underlay",
+		"coords": [ 22, 0, 1227, 613 ],
+		"description":"mud fossil notebook"
+	},
+        {
+                "name":"mud2",
+                "type":"image",
+                "img":"mudb.png",
+                "function":"underlay",
+                "coords": [ 61, 0, 1211, 640 ],
+                "description":"mud fossil"
+        },
+        {
+                "name":"mud3",
+                "type":"image",
+                "img":"mudc.png",
+                "function":"underlay",
+                "coords": [ 95, 64, 671, 388 ],
+                "description":"mud fossil hand"
+        }
+]
+}
