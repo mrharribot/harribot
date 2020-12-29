@@ -10,14 +10,97 @@ import aiohttp
 #rom wand.image import Image
 import requests
 from io import BytesIO
-from PIL import Image
+from PIL import Image,ExifTags
 import json
-import os
 from dotenv import load_dotenv
 
 client = discord.Client()
 
-async def image_handler(channel, command):
+def parse_options(string):
+    
+    args = {}
+    skip = False
+
+    options = {"flip":["h","v"], "edge":["l","r","u","d"], "posx":[0,100], "posy":[0,100], "size":[0,200], "rot":[0,360]}
+    lst = [i.replace(",",":").replace(";",":").split(":") for i in string + ["null"]]    #lmao
+    for item, item1 in zip(lst, lst[1:]):
+        if(skip):
+            skip = False
+            continue
+        if(len(item) == 1):
+            if(item[0] in options.keys()):      #find a key, check if next item is a value, we can't do any f/b trickery
+                if(item1[0] in options.keys()): #if we have another key then skip, otherwise try to interpret
+                    continue
+
+                val = options[item[0]]
+                if(type(val[0]) is int):        #consider refactoring this out since its identical to the block below
+                    if(item1[0].isdigit()):
+                        item1[0] = int(item1[0])
+                        if(item1[0] >= val[0] and item1[0] <= val[1]):
+                            args[item[0]] = item1[0]
+                            skip = True
+                elif(type(options[item[0]][0]) is str):
+                    if(item1[0] in val):
+                        args[item[0]] = item1[0]            #ok now we have stolen the next value we should skip next iter right?
+                        skip = True
+            else:          #we didn't find a key, try to interpret the value as a value! oh wow ok.
+                if(item[0].isdigit()):
+                    item[0] = int(item[0])
+                    for cand in options:
+                        if(not (cand in args)):
+                            if(type(options[cand][0]) is int):
+                                if(item[0] >= options[cand][0] and item[0] <= options[cand][1]):
+                                    args[cand] = item[0]
+                                    break
+                else:
+                    for cand in options: 
+                        if(not(cand in args)):
+                            if(item[0] in options[cand]):
+                                args[cand] = item[0]
+                                break
+
+        if(len(item) == 2):
+            if(item[0] in options.keys()):
+                val = options[item[0]]
+                if(type(val[0]) is int):
+                    if(item[1].isdigit()):
+                        item[1] = int(item[1])
+                        if(item[1] >= val[0] and item[1] <= val[1]):
+                            args[item[0]] = item[1]
+                elif(type(options[item[0]][0]) is str):
+                    if(item[1] in val):
+                        args[item[0]] = item[1]
+ 
+        if(len(item) > 2):
+            pass
+    return args
+
+#or convenience, here is what the letter F would look like if it were tagged correctly and displayed by a program that ignores the orientation tag (thus showing the stored image):
+#
+#    1      2       3      4         5            6           7          8
+#
+#  88888  888888      88  88      8888888888  88                  88  8888888888
+#  8          88      88  88      88  88      88  88          88  88      88  88
+#  888      8888    8888  8888    88          8888888888  8888888888          88
+#  8          88      88  88
+#  8          88  888888  888888
+def exif_rot(im):
+
+    if(0x112 in im.getexif()):
+        rot = im.getexif()[0x112]
+        if(rot > 4):
+            im = im.transpose(Image.ROTATE_90)
+            rot = abs(rot - 9)
+        if(rot > 2):
+            im = im.transpose(Image.ROTATE_180)
+            rot = rot - 2
+        if(rot > 1):
+            im = im.transpose(Image.FLIP_LEFT_RIGHT)
+    return (im)
+
+    
+
+async def image_handler(channel, command, args):
     if not ("count" in command.keys()):
         command["count"] = 1
 
@@ -30,15 +113,40 @@ async def image_handler(channel, command):
     if(command["function"] == "overlay"):
         resp = requests.get(url_list[0])
         if resp.status_code==200:
-            base = Image.open(BytesIO(resp.content)).convert("RGBA")
+
+            base = exif_rot(Image.open(BytesIO(resp.content)).convert("RGBA"))
+            
             overlay = Image.open(command["img"]).convert("RGBA")
+            if("flip" in args.keys()):
+                if(args["flip"] == "h"):
+                    overlay = overlay.transpose(Image.FLIP_TOP_BOTTOM)
+                if(args["flip"] == "v"):
+                    overlay = overlay.transpose(Image.FLIP_LEFT_RIGHT)
 
-            ratio = (base.height * 0.75) / overlay.height
-            #print(f"{img.size} {overlay.size} {ratio} {overlay.height} {overlay.height*ratio}")
+            if("size" in args.keys()):
+                ratio = (base.height * (args["size"]/100) / overlay.height)
+            else:
+                ratio = (base.height * 0.75 / overlay.height)
+
             overlay = overlay.resize((round(overlay.size[0]*ratio), round(overlay.size[1]*ratio)))
-            base.paste(overlay, (base.width-overlay.width,base.height-overlay.height), overlay )
-            #base.save("plop.png", "PNG")
 
+            if not("posx" in args.keys()):
+                args["posx"] = 100
+
+            if not("posy" in args.keys()):
+                args["posy"] = 100
+
+            if("rot" in args.keys()):
+                overlay = overlay.rotate(args["rot"])
+
+            if not("posx" in args.keys()):
+                args["posx"] = 100
+            if not("posy" in args.keys()):
+                args["posy"] = 100
+
+            base.paste(overlay, (round((base.width-overlay.width)*(args["posx"]/100)),round((base.height-overlay.height)*(args["posy"]/100))), overlay )
+
+            base.save("test.png", 'PNG')
             with BytesIO() as im_bin:
                 base.save(im_bin, 'PNG')
                 im_bin.seek(0)
@@ -47,7 +155,7 @@ async def image_handler(channel, command):
     elif(command["function"] == "underlay"):
         resp = requests.get(url_list[0])
         if resp.status_code==200:
-            underlay = Image.open(BytesIO(resp.content)).convert("RGBA")
+            underlay = exif_rot(Image.open(BytesIO(resp.content)).convert("RGBA"))
             base = Image.open(command["img"]).convert("RGBA")
             underlay = underlay.resize((round(command["coords"][2] - command["coords"][0]), round(command["coords"][3] - command["coords"][1])))
             inter = Image.new('RGBA', base.size, (255,255,255))
@@ -111,6 +219,7 @@ async def on_message(message):
     if message.content.startswith('$'):
         msg = message.content.split()
         req = msg[0][1:]
+        args = parse_options(msg[1:])
 
 
         if(req == "help"):
@@ -161,7 +270,7 @@ async def on_message(message):
         for cmd in commands:
             if(cmd["name"] == req):
                 if(cmd["type"] == "image"):
-                    await image_handler(message.channel, cmd)
+                    await image_handler(message.channel, cmd, args)
                     return
 
 if __name__ == "__main__":
@@ -169,6 +278,7 @@ if __name__ == "__main__":
         config = json.load(f)
 
     commands = config['COMMANDS']
+
 
     load_dotenv()
     client.run(os.getenv("DISCORD_TOKEN")
